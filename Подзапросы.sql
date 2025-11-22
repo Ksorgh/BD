@@ -145,6 +145,9 @@ having SUM(`time`) > (SELECT
             gamers_games `inner`
         WHERE
             `outer`.`date` = `inner`.`date`);
+            
+            
+#---------------------------------------------------------------------------------------------
 
 #вывод игроков которые проводят выше среднего времени на сервере
 SELECT 
@@ -155,32 +158,117 @@ WHERE
     `duration_minutes` > (SELECT 
             avg(`duration_minutes`)
         FROM
-            player_sessions `inner`);
+            player_sessions `inner`
+            where
+            `outer`.`player_id` = `inner`.`player_id`);
 
 
-#вывод игроков без банов
-SELECT
-	player_name as 'Игрок',
-    steam_id as 'SteamID',
-    balance as 'Баланс',
-    registration_date as 'Дата регистрации'
-    FROM 
-    players
-    where 
-    player_id 
-    not in (select player_id 
-    from  bans);
-
-
-#вывод топ 5 игроков по онлайну
+#вывод игроков получивших больше одного бана
 SELECT 
-    player_name AS 'Игрок',
-    steam_id AS 'SteamID',
-    (
-        SELECT ROUND(SUM(TIMESTAMPDIFF(MINUTE, connect_time, disconnect_time)) / 60, 1)
-        FROM player_sessions ps 
-        WHERE ps.player_id = p.player_id
-    ) AS 'Часов_всего'
-FROM players p
-ORDER BY Часов_всего DESC
-LIMIT 5;
+    *
+FROM
+    players `outer`
+WHERE
+    1 < (SELECT 
+            count(*)
+        FROM
+            bans `inner`
+        WHERE
+            `outer`.player_id = `inner`.player_id);
+
+
+#вывод админов которые вынесли больше двух наказаний
+SELECT 
+    player_name, admin_id, steam_id
+FROM
+    admins `outer`,
+    players
+WHERE
+    2 < (SELECT 
+            COUNT(*)
+        FROM
+            bans `inner`
+        WHERE
+            `outer`.admin_id = `inner`.admin_id
+                AND `outer`.player_id = players.player_id);
+
+#---------------------------------------------------------------------------------------------
+#Оператор EXISTS - выводит результат если подзапрос выдает какое либо значение 
+SELECT 
+    `name`, `dob`
+FROM
+    gamers
+WHERE
+    EXISTS( SELECT 
+            *
+        FROM
+            gamers
+        WHERE
+            country = 'USA');
+            
+#использвание оператора екзист со связанными подзапросами
+#поиск игроков, у которых любимая игра совпадает с другими игроками
+SELECT 
+    *
+FROM
+    gamers `outer`
+WHERE
+    EXISTS( SELECT 
+            *
+        FROM
+            gamers `inner`
+        WHERE
+            `outer`.favourite_game = `inner`.favourite_game
+                AND `inner`.idgamers <> `outer`.idgamers);
+                
+#соединние таблиц связанных подзапросах
+SELECT 
+    `name`,`outer`.`country`,`game_name`
+FROM
+    gamers `outer`, games
+WHERE
+    EXISTS( SELECT 
+            *
+        FROM
+            gamers `inner`
+        WHERE
+            `outer`.favourite_game = `inner`.favourite_game
+                AND `inner`.idgamers <> `outer`.idgamers
+					and `outer`.favourite_game = `games`.idgames); 
+                    
+#спользование нот екзист
+SELECT 
+    *
+FROM
+    gamers `outer`
+WHERE
+    NOT EXISTS( SELECT 
+            *
+        FROM
+            gamers `inner`
+        WHERE
+            `outer`.favourite_game = `inner`.favourite_game
+                AND `inner`.idgamers <> `outer`.idgamers);
+                
+                
+
+#podzapros vtorogo yrovnya vlozhenosti
+
+SELECT 
+    *
+FROM
+    games `outer1`
+WHERE
+    EXISTS( SELECT 
+            *
+        FROM
+            gamers `outer2`
+        WHERE
+            `outer1`.idgames = `outer2`.favourite_game
+                AND 1 < (SELECT 
+                    COUNT(*)
+                FROM
+                    gamers_games `inner`
+                WHERE
+                    `inner`.idgamers = `outer2`.idgamers));
+        
